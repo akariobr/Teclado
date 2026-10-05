@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="Teclado virtual com 12 timbres sampleados de piano acústico e elétrico.">
+  <title>Teclado de Pianos Sampleados</title>
+  <script src="https://surikov.github.io/webaudiofont/npm/dist/WebAudioFontPlayer.js"></script>
+  <style>
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+:root {
+  --body-bg: #080b10;
+  --frame-top: #30343b;
+  --frame-bottom: #16191e;
+  --panel: #171a1f;
+  --panel-edge: #060709;
+  --accent: #d79b31;
+  --accent-light: #f5c96b;
+  --display-green: #a7ffbf;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, #20252c 0%, var(--body-bg) 76%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  touch-action: none;
+  position: fixed;
+}
+
+.app-frame {
+  width: 100vw;
+  height: 100vh;
+  position: absolute;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  background: linear-gradient(145deg, var(--frame-top), var(--frame-bottom) 55%, #0b0d10);
+  border: 7px solid #0a0c0f;
+  border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -1px 0 #000, 0 14px 35px rgba(0,0,0,.85);
+}
+
+.keyboard-panel-side {
+  width: 95px;
+  height: 100%;
+  flex: 0 0 95px;
+  position: relative;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 8px;
+  background: linear-gradient(90deg, #0b0d10, #20242a 48%, #0d0f13);
+  border-right: 2px solid #07080a;
+  box-shadow: inset -1px 0 rgba(255,255,255,.09), 4px 0 10px rgba(0,0,0,.45);
+}
+
+.keyboard-panel-side::after {
+  content: "";
+  position: absolute;
+  inset: 8px 6px;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 3px;
+}
+
+.record-panel-side {
+  width: 78px;
+  height: 100%;
+  flex: 0 0 78px;
+  position: relative;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 7px;
+  background: linear-gradient(270deg, #0b0d10, #20242a 48%, #0d0f13);
+  border-left: 2px solid #07080a;
+  box-shadow: inset 1px 0 rgba(255,255,255,.09), -4px 0 10px rgba(0,0,0,.45);
+}
+
+.record-panel-side::after {
+  content: "";
+  position: absolute;
+  inset: 8px 6px;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 3px;
+}
+
+.record-btn {
+  width: 61px;
+  height: 48px;
+  writing-mode: horizontal-tb;
+  transform: none;
+  font-size: 9px;
+  letter-spacing: .15px;
+  z-index: 1;
+}
+
+.record-btn.is-recording {
+  color: #fff;
+  border-color: #9b3026;
+  background: linear-gradient(180deg, #e46655, #a52f26 54%, #6c1c17);
+  box-shadow: inset 0 2px 4px rgba(60,0,0,.55), 0 0 8px rgba(220,75,55,.45);
+}
+
+.record-btn.is-playing {
+  color: #fff3d0;
+  border-color: #805b1c;
+  background: linear-gradient(180deg, #e8b551, #a56f1c 54%, #6c4511);
+}
+
+.recording-counter {
+  width: 64px;
+  min-height: 28px;
+  color: #aeb4bb;
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+  line-height: 1.2;
+  text-align: center;
+  z-index: 1;
+}
+
+.panel-group {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  z-index: 1;
+}
+
+.panel-group .menu-trigger:not(.record-btn) {
+  height: 34px;
+}
+
+#btn-clear-notes .menu-label,
+#btn-toggle-notes .menu-label {
+  font-size: 6px;
+}
+
+.menu-trigger {
+  width: 62px;
+  height: 40px;
+  writing-mode: horizontal-tb;
+  transform: none;
+  font-size: 9px;
+  letter-spacing: .2px;
+}
+
+.menu-panel {
+  display: none;
+  position: absolute;
+  top: 59px;
+  left: 5px;
+  width: 84px;
+  max-height: calc(100vh - 70px);
+  overflow-y: auto;
+  padding: 5px;
+  z-index: 80;
+  background: linear-gradient(180deg, #252a30, #111419);
+  border: 1px solid #555d65;
+  border-radius: 4px;
+  box-shadow: 0 5px 14px rgba(0,0,0,.85), inset 0 1px rgba(255,255,255,.12);
+}
+
+.menu-panel.open { display: grid; }
+.menu-panel.config-menu,
+.menu-panel.recorder-menu { grid-template-columns: repeat(2, 1fr); gap: 4px; }
+.menu-panel.config-menu .panel-btn,
+.menu-panel.recorder-menu .panel-btn { width: 28px; height: 40px; font-size: 6.5px; }
+.menu-panel.recorder-menu .recording-counter { grid-column: 1 / -1; width: 100%; }
+
+.menu-panel.instrument-menu {
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px 4px;
+}
+
+.menu-panel.instrument-menu .panel-btn {
+  width: 28px;
+  height: 35px;
+  font-size: 6.5px;
+}
+
+.menu-panel .record-btn {
+  width: 64px;
+  height: 36px;
+  font-size: 7px;
+}
+
+.menu-panel .panel-btn {
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: clip;
+}
+
+.menu-panel .config-screen-btn {
+  grid-column: 1 / -1;
+  width: 32px !important;
+  height: 35px;
+  justify-self: center;
+}
+
+.panel-btn.menu-trigger {
+  width: 30px;
+  height: 50px;
+  min-height: 0;
+  padding: 1mm 3px;
+  writing-mode: horizontal-tb;
+  transform: none;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: clip;
+  line-height: 1;
+}
+
+.menu-label {
+  display: block;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  font-size: 7px;
+  line-height: 1;
+  letter-spacing: -.25px;
+}
+
+#btn-play.menu-trigger {
+  height: 35px;
+}
+
+.tempo-control {
+  grid-column: 1 / -1;
+  width: 76px;
+  padding: 4px 2px 3px;
+  color: #dce1e5;
+  font-size: 8px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.tempo-control input[type="number"] {
+  display: block;
+  width: 70px;
+  height: 25px;
+  margin: 4px auto 0;
+  padding: 2px 3px;
+  color: var(--accent-light);
+  background: #0b0e11;
+  border: 1px solid #65707a;
+  border-radius: 3px;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.tempo-value {
+  display: block;
+  color: var(--accent-light);
+  font-family: "Courier New", monospace;
+  font-size: 8px;
+}
+
+.instrument-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px 4px;
+  width: 78px;
+}
+
+.instrument-group .panel-btn {
+  width: 36px;
+  height: 32px;
+  font-size: 7px;
+}
+
+.panel-btn {
+  width: 42px;
+  height: 38px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #08090b;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #5b626b 0%, #373d45 47%, #22262c 52%, #15181c 100%);
+  color: #dce1e5;
+  text-shadow: 0 -1px #000, 0 1px rgba(255,255,255,.12);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .35px;
+  cursor: pointer;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.24), inset 0 -2px 0 rgba(0,0,0,.5), 0 2px 3px #000;
+  transition: filter .08s, transform .08s, box-shadow .08s;
+}
+
+.panel-btn:active,
+.panel-btn.active-state {
+  color: #fff3d0;
+  border-color: #805b1c;
+  background: linear-gradient(180deg, #e8b551, #a56f1c 54%, #6c4511);
+  text-shadow: 0 1px 2px #5c3704;
+  box-shadow: inset 0 2px 4px rgba(60,31,0,.55), 0 0 7px rgba(215,155,49,.28);
+}
+
+.led-display {
+  width: 78px;
+  height: 100px;
+  padding: 8px 3px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: var(--display-green);
+  font-family: "Courier New", monospace;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  white-space: nowrap;
+  background: radial-gradient(ellipse at 42% 28%, #315b40 0%, #172b20 42%, #0c1710 74%, #060b08 100%);
+  border: 3px solid #070b08;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #536b59, inset 0 0 20px #000, 0 3px 7px #000, 0 0 10px rgba(103, 215, 135, .12);
+  text-shadow: 0 0 7px rgba(167,255,191,.85), 0 0 14px rgba(103,215,135,.38);
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -50px 0 0 -39px;
+}
+
+.led-display::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  pointer-events: none;
+  border: 1px solid rgba(181, 255, 198, .18);
+  border-radius: 3px;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, .7);
+}
+
+
+.led-display .led-accidental-note {
+  display: block;
+  writing-mode: vertical-lr;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.led-display #led-note.led-dual-note {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  writing-mode: vertical-lr;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.recording-note-monitor {
+  position: absolute;
+  top: calc(50% + 59px);
+  left: 50%;
+  width: 78px;
+  height: min(42vh, calc(50vh - 70px));
+  min-height: 150px;
+  max-height: 380px;
+  margin-left: -39px;
+  padding: 8px 5px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 42% 28%, #273c45 0%, #111c22 48%, #080d11 100%);
+  border: 2px solid #070b0e;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px #52636a, inset 0 0 12px #000, 0 3px 7px #000;
+  z-index: 2;
+}
+
+.recording-note-monitor.notes-hidden {
+  opacity: .16;
+  filter: saturate(.35);
+}
+
+.recording-note-monitor.notes-hidden .note-sequence {
+  visibility: hidden;
+}
+
+.note-sequence {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: block !important;
+  direction: ltr !important;
+  writing-mode: vertical-rl !important;
+  overflow-x: hidden;
+  overflow-y: hidden;
+}
+
+.recording-note-line {
+  position: absolute;
+  left: 0;
+  top: auto;
+  bottom: auto;
+  flex: none !important;
+  width: 18px;
+  min-width: 18px;
+  height: 28px;
+  min-height: 28px;
+  margin-left: 0;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6f8991;
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: .4px;
+  writing-mode: vertical-lr;
+  transform: rotate(180deg);
+  border: 1px solid rgba(138, 177, 183, .16);
+  border-radius: 2px;
+  background: rgba(0, 0, 0, .22);
+  transition: color .1s, background .1s, border-color .1s, text-shadow .1s;
+}
+
+.recording-note-line.has-note { color: #b8d3d3; }
+.recording-note-line.current {
+  color: #f5c96b;
+  border-color: rgba(215, 155, 49, .8);
+  background: rgba(132, 83, 13, .38);
+  text-shadow: 0 0 6px rgba(245, 201, 107, .8);
+}
+
+.main-content {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  position: relative;
+  width: calc(100% - 95px);
+  height: 100%;
+  padding: 8px 8px 8px 6px;
+  background: linear-gradient(180deg, #171a1f, #090b0e);
+}
+
+@media (max-width: 520px) {
+  .record-panel-side { width: 70px; flex-basis: 70px; padding-left: 4px; padding-right: 4px; }
+  .record-btn { width: 57px; font-size: 8px; }
+}
+
+.keyboard-container {
+  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: none;
+  background: #08090b;
+  border: 2px solid #050608;
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 1px #3a3e44, inset 0 0 16px #000, 0 2px 4px #000;
+}
+
+.white-key {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  padding-left: 11px;
+  z-index: 1;
+  cursor: pointer;
+  color: #6f747a;
+  font-size: 9px;
+  font-weight: 700;
+  text-shadow: 0 1px #fff;
+  background: linear-gradient(90deg, #f8f8f6 0%, #e4e5e2 62%, #b7bab9 100%);
+  border-bottom: 1px solid #737777;
+  box-shadow: inset 0 1px rgba(255,255,255,.9), inset -8px 0 12px rgba(0,0,0,.16), 0 1px 1px rgba(0,0,0,.8);
+}
+
+.white-key::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  top: 3px;
+  bottom: 3px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(#fff, #aeb2b1);
+  opacity: .75;
+}
+
+.white-key.active {
+  color: #fff8de;
+  text-shadow: 0 1px 2px #603d0b;
+  background: linear-gradient(90deg, #e8b047 0%, #c88b27 64%, #865914 100%) !important;
+  box-shadow: inset 0 2px 5px rgba(87,49,5,.65), inset -8px 0 12px rgba(0,0,0,.2);
+}
+
+.black-key {
+  position: absolute;
+  left: 0;
+  width: 58%;
+  display: flex;
+  align-items: center;
+  padding-left: 7px;
+  z-index: 10;
+  cursor: pointer;
+  color: #aeb4bb;
+  font-size: 8px;
+  font-weight: 700;
+  text-shadow: 0 -1px #000;
+  background: linear-gradient(90deg, #050607 0%, #1c2025 50%, #3b4147 91%, #101216 100%);
+  border: 1px solid #020304;
+  border-left: none;
+  border-radius: 0 4px 4px 0;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.16), inset 0 -2px 0 #000, 5px 3px 5px rgba(0,0,0,.72);
+}
+
+.black-key::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: 3px;
+  height: 1px;
+  background: rgba(255,255,255,.19);
+}
+
+.black-key.active {
+  color: #fff4cc;
+  background: linear-gradient(90deg, #70470d, #c58a28 56%, #edbd55 100%) !important;
+  box-shadow: inset 0 2px 4px rgba(52,28,0,.7), 4px 2px 4px #000;
+}
+
+
+.audio-status {
+  position: fixed;
+  left: 105px;
+  bottom: 14px;
+  z-index: 100;
+  max-width: calc(100vw - 120px);
+  padding: 8px 10px;
+  border: 1px solid rgba(215,155,49,.45);
+  border-radius: 4px;
+  background: rgba(7,10,13,.9);
+  color: #f5c96b;
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity .18s, transform .18s;
+  pointer-events: none;
+}
+.audio-status.visible { opacity: 1; transform: translateY(0); }
+.audio-status.error { color: #ffd1c9; border-color: rgba(230,105,80,.7); }
+  </style>
+</head>
+<body oncontextmenu="return false;">
+
+  <div class="app-frame">
+    <!-- Painel Lateral Esquerdo com a mesma exata disposição estrutural, mas botões e visor orientados na vertical -->
+    <div class="keyboard-panel-side">
+      <div class="panel-group">
+        <button class="panel-btn menu-trigger" onclick="toggleMenu('instrument-menu')"><span class="menu-label">TIMBRE</span></button>
+        <button class="panel-btn menu-trigger" onclick="toggleMenu('config-menu')"><span class="menu-label">CONFIG</span></button>
+        <button class="panel-btn menu-trigger record-btn" id="btn-record" title="Apaga a gravação anterior e começa uma nova" aria-label="Gravar nova sequência" onclick="toggleRecording()"><span class="menu-label">GRAVAR</span></button>
+        <button class="panel-btn menu-trigger record-btn" id="btn-play" title="Reproduzir a última sequência gravada" aria-label="Reproduzir gravação" onclick="playRecording()"><span class="menu-label">PLAY</span></button>
+        <button class="panel-btn menu-trigger" id="btn-clear-notes" title="Limpar as notas mostradas no visor" aria-label="Limpar notas do visor" onclick="clearNoteDisplay()"><span class="menu-label">LIMPAR</span></button>
+        <button class="panel-btn menu-trigger active-state" id="btn-toggle-notes" title="Ligar ou desligar as notas do visor" aria-label="Ligar ou desligar notas do visor" onclick="toggleNoteDisplay()"><span class="menu-label">NOTAS</span></button>
+        <div class="recording-counter" id="recording-counter" aria-live="polite">0 notas</div>
+      </div>
+
+      <div class="led-display" id="led-display">
+        <span id="led-note">--</span>
+      </div>
+
+      <div class="recording-note-monitor" id="recording-note-monitor" aria-label="Notas da gravação">
+        <div class="note-sequence" id="note-sequence">
+          <div class="recording-note-line" style="bottom:0">--</div>
+        </div>
+      </div>
+
+      <div class="menu-panel instrument-menu" id="instrument-menu" aria-label="Timbres de piano">
+        <button class="panel-btn timbre-btn active-state" id="btn-timbre-concert" title="Grand acústico de concerto — FluidR3" aria-label="Grand acústico de concerto" onclick="setTimbre('concert')">CONC</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-warm" title="Grand acústico quente — GeneralUser GS" aria-label="Grand acústico quente" onclick="setTimbre('warm')">WARM</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-bright" title="Grand acústico brilhante — FluidR3" aria-label="Grand acústico brilhante" onclick="setTimbre('bright')">BRIL</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-pop" title="Grand brilhante/pop — GeneralUser GS" aria-label="Grand brilhante para pop" onclick="setTimbre('pop')">POP</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-electricGrand" title="Piano elétrico de cauda — FluidR3" aria-label="Piano elétrico de cauda" onclick="setTimbre('electricGrand')">EGRD</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-electricGrandWarm" title="Piano elétrico de cauda — GeneralUser GS" aria-label="Piano elétrico de cauda, versão quente" onclick="setTimbre('electricGrandWarm')">STGE</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-honky" title="Honky-tonk — FluidR3" aria-label="Piano honky-tonk" onclick="setTimbre('honky')">HONK</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-honkyVintage" title="Honky-tonk — GeneralUser GS" aria-label="Piano honky-tonk vintage" onclick="setTimbre('honkyVintage')">VINT</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-rhodes" title="Piano elétrico EP1, estilo Rhodes — FluidR3" aria-label="Piano elétrico EP1 estilo Rhodes" onclick="setTimbre('rhodes')">RHDS</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-stageEP" title="Piano elétrico EP1 de palco — GeneralUser GS" aria-label="Piano elétrico EP1 de palco" onclick="setTimbre('stageEP')">EP1</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-fm" title="Piano elétrico EP2, estilo FM/DX — FluidR3" aria-label="Piano elétrico EP2 estilo FM" onclick="setTimbre('fm')">FM</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-digitalEP" title="Piano elétrico EP2 — GeneralUser GS" aria-label="Piano elétrico EP2 digital" onclick="setTimbre('digitalEP')">EP2</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-accordionConcert" title="Acordeon de concerto — FluidR3" aria-label="Acordeon de concerto" onclick="setTimbre('accordionConcert')">ACOR</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-accordionFolk" title="Acordeon folk — GeneralUser GS" aria-label="Acordeon folk" onclick="setTimbre('accordionFolk')">FOLK</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-accordionBright" title="Acordeon brilhante — Aspirin" aria-label="Acordeon brilhante" onclick="setTimbre('accordionBright')">BRIL</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-accordionVintage" title="Acordeon vintage — JCLive" aria-label="Acordeon vintage" onclick="setTimbre('accordionVintage')">VINT</button>
+        <button class="panel-btn timbre-btn" id="btn-timbre-accordionTango" title="Acordeon tango — GeneralUser GS" aria-label="Acordeon tango" onclick="setTimbre('accordionTango')">TANGO</button>
+      </div>
+
+      <div class="menu-panel config-menu" id="config-menu" aria-label="Configurações do teclado">
+        <button class="panel-btn" onclick="changeOctave(1)">OCT+</button>
+        <button class="panel-btn" onclick="changeOctave(-1)">OCT-</button>
+        <button class="panel-btn" id="btn-sustain" onclick="toggleSustain()">SUST</button>
+        <button class="panel-btn" id="btn-dual" onclick="toggleDual()">DUAL</button>
+        <button class="panel-btn" id="btn-metronome" onclick="toggleMetronome()">METRO</button>
+        <button class="panel-btn config-screen-btn" onclick="toggleFullscreen()">TELA</button>
+        <label class="tempo-control" for="tempo-range">TEMPO
+          <input id="tempo-range" type="number" min="40" max="240" step="1" value="100" inputmode="numeric" oninput="setTempo(this.value)">
+          <span class="tempo-value" id="tempo-value">100 BPM</span>
+        </label>
+      </div>
+
+    </div>
+
+    <!-- Área das Teclas Verticais -->
+    <div class="main-content">
+      <div class="keyboard-container" id="keyboard"></div>
+    </div>
+  </div>
+  <div class="audio-status" id="audio-status" role="status" aria-live="polite"></div>
+
+  <script>
+    window.oncontextmenu = function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      return false;
+    };
+
+    document.addEventListener('touchmove', function(e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    let currentOctaveOffset = 0;
+    let sustainEnabled = false;
+    let dualEnabled = false;
+    let currentTimbre = 'concert';
+    let secondTimbre = null;
+    let currentNoteName = '--';
+    let metronomeEnabled = false;
+    let metronomeBpm = 100;
+    let metronomeTimer = null;
+    let metronomeBeat = 0;
+    let isRecording = false;
+    let isPlayingRecording = false;
+    let recordingStartedAt = 0;
+    let recordedSequence = [];
+    let liveNoteSequence = [];
+    let noteDisplayEnabled = true;
+    const liveNoteHeld = {};
+    const recordingNoteStarts = {};
+    let playbackTimers = [];
+
+    function updateLed() {
+      document.getElementById('led-note').innerHTML = currentNoteName;
+    }
+
+    function toggleMenu(menuId) {
+      const target = document.getElementById(menuId);
+      if (!target) return;
+      const wasOpen = target.classList.contains('open');
+      document.querySelectorAll('.menu-panel').forEach(menu => menu.classList.remove('open'));
+      if (!wasOpen) target.classList.add('open');
+    }
+
+    document.addEventListener('pointerdown', (event) => {
+      if (!event.target.closest('.keyboard-panel-side')) {
+        document.querySelectorAll('.menu-panel').forEach(menu => menu.classList.remove('open'));
+      }
+    });
+
+    function changeOctave(dir) {
+      currentOctaveOffset += dir;
+      if (currentOctaveOffset < -2) currentOctaveOffset = -2;
+      if (currentOctaveOffset > 2) currentOctaveOffset = 2;
+      updateLed();
+    }
+
+    function toggleSustain() {
+      sustainEnabled = !sustainEnabled;
+      const btn = document.getElementById('btn-sustain');
+      if (sustainEnabled) {
+        btn.classList.add('active-state');
+      } else {
+        btn.classList.remove('active-state');
+      }
+    }
+
+    function updateRecordingCounter() {
+      const counter = document.getElementById('recording-counter');
+      if (!counter) return;
+      const count = recordedSequence.length;
+      counter.textContent = count === 1 ? '1 nota' : `${count} notas`;
+      renderRecordedNotes();
+    }
+
+    function noteMonitorText(entry) {
+      if (!entry) return '--';
+      const note = NOTES.find(item => item.id === entry.id);
+      if (!note) return '--';
+      const solfege = {
+        C: 'DÓ', 'C#': 'DÓ#', D: 'RÉ', 'D#': 'RÉ#', E: 'MI',
+        F: 'FÁ', 'F#': 'FÁ#', G: 'SOL', 'G#': 'SOL#',
+        A: 'LÁ', 'A#': 'LÁ#', B: 'SI'
+      };
+      return solfege[note.namePt] || '--';
+    }
+
+    function renderNoteMonitor(entries, activeIndex = -1) {
+      const monitor = document.getElementById('note-sequence');
+      if (!monitor) return;
+      const monitorPanel = document.getElementById('recording-note-monitor');
+      if (monitorPanel) monitorPanel.classList.toggle('notes-hidden', !noteDisplayEnabled);
+      if (!noteDisplayEnabled) return;
+      const rowsPerColumn = Math.max(1, Math.floor(monitor.clientHeight / 30));
+      const capacity = rowsPerColumn * 3;
+      const referenceIndex = activeIndex >= 0 ? activeIndex : Math.max(0, entries.length - 1);
+      const cycleStart = Math.floor(referenceIndex / capacity) * capacity;
+      const visibleEntries = entries.length ? entries.slice(cycleStart, cycleStart + capacity) : [null];
+      const visibleActiveIndex = activeIndex >= cycleStart ? activeIndex - cycleStart : -1;
+      monitor.innerHTML = visibleEntries.map((entry, index) => {
+        const current = index === visibleActiveIndex && entry;
+        const classes = ['recording-note-line'];
+        if (entry) classes.push('has-note');
+        if (current) classes.push('current');
+        const column = Math.floor(index / rowsPerColumn);
+        const row = index % rowsPerColumn;
+        const left = column * 20;
+        const bottom = row * 30;
+        return `<div class="${classes.join(' ')}" style="left:${left}px;bottom:${bottom}px">${noteMonitorText(entry)}</div>`;
+      }).join('');
+    }
+
+    function renderRecordedNotes() {
+      renderNoteMonitor(liveNoteSequence);
+    }
+
+    function clearNoteDisplay() {
+      liveNoteSequence = [];
+      renderNoteMonitor([]);
+    }
+
+    function toggleNoteDisplay() {
+      noteDisplayEnabled = !noteDisplayEnabled;
+      const button = document.getElementById('btn-toggle-notes');
+      if (button) button.classList.toggle('active-state', noteDisplayEnabled);
+      const panel = document.getElementById('recording-note-monitor');
+      if (panel) panel.classList.toggle('notes-hidden', !noteDisplayEnabled);
+      if (noteDisplayEnabled) renderNoteMonitor(liveNoteSequence);
+    }
+
+    function toggleRecording() {
+      if (isRecording) {
+        stopRecording();
+        return;
+      }
+      stopPlayback();
+      recordedSequence = [];
+      liveNoteSequence = [];
+      Object.keys(recordingNoteStarts).forEach(key => delete recordingNoteStarts[key]);
+      recordingStartedAt = performance.now();
+      isRecording = true;
+      const button = document.getElementById('btn-record');
+      button.classList.add('is-recording');
+      const label = button.querySelector('.menu-label');
+      if (label) label.textContent = 'PARAR';
+      updateRecordingCounter();
+    }
+
+    function stopRecording() {
+      if (!isRecording) return;
+      const now = performance.now();
+      Object.keys(recordingNoteStarts).forEach(id => finishRecordedNote(Number(id), now));
+      isRecording = false;
+      const button = document.getElementById('btn-record');
+      button.classList.remove('is-recording');
+      const label = button.querySelector('.menu-label');
+      if (label) label.textContent = 'GRAVAR';
+      updateRecordingCounter();
+    }
+
+    function recordNoteOn(id) {
+      if (liveNoteHeld[id]) return;
+      liveNoteHeld[id] = true;
+      const entry = { id, octaveOffset: currentOctaveOffset };
+      liveNoteSequence.push(entry);
+      renderNoteMonitor(liveNoteSequence, liveNoteSequence.length - 1);
+      if (!isRecording || recordingNoteStarts[id] !== undefined) return;
+      recordingNoteStarts[id] = { time: performance.now(), octaveOffset: currentOctaveOffset };
+    }
+
+    function finishRecordedNote(id, timestamp = performance.now()) {
+      delete liveNoteHeld[id];
+      if (!isRecording || recordingNoteStarts[id] === undefined) return;
+      const start = recordingNoteStarts[id].time;
+      const octaveOffset = recordingNoteStarts[id].octaveOffset;
+      delete recordingNoteStarts[id];
+      const note = NOTES.find(item => item.id === id);
+      if (!note) return;
+      recordedSequence.push({
+        id,
+        octaveOffset,
+        start: Math.max(0, start - recordingStartedAt),
+        duration: Math.max(80, timestamp - start)
+      });
+      updateRecordingCounter();
+    }
+
+    function stopPlayback() {
+      playbackTimers.forEach(timer => clearTimeout(timer));
+      playbackTimers = [];
+      isPlayingRecording = false;
+      const button = document.getElementById('btn-play');
+      if (button) button.classList.remove('is-playing');
+    }
+
+    function playRecording() {
+      if (isRecording) stopRecording();
+      if (!recordedSequence.length) {
+        showAudioStatus('Ainda não há nenhuma gravação para tocar.', true, 2200);
+        return;
+      }
+      stopPlayback();
+      isPlayingRecording = true;
+      const button = document.getElementById('btn-play');
+      button.classList.add('is-playing');
+      showAudioStatus('Reproduzindo gravação…', false, 45000);
+      const sequence = recordedSequence.map(note => ({ ...note }));
+      const endTime = Math.max(...sequence.map(note => note.start + note.duration));
+      sequence.forEach(note => {
+        playbackTimers.push(setTimeout(() => {
+          if (isPlayingRecording) {
+            const sequenceIndex = sequence.indexOf(note);
+            renderNoteMonitor(sequence, sequenceIndex);
+            playSound(note.id, note.octaveOffset);
+          }
+        }, note.start));
+        playbackTimers.push(setTimeout(() => {
+          if (isPlayingRecording) stopSound(note.id);
+        }, note.start + note.duration));
+      });
+      playbackTimers.push(setTimeout(() => {
+        if (!isPlayingRecording) return;
+        stopPlayback();
+        renderRecordedNotes();
+        showAudioStatus('Reprodução concluída', false, 1200);
+      }, endTime + 100));
+    }
+
+    function toggleMetronome() {
+      metronomeEnabled = !metronomeEnabled;
+      const button = document.getElementById('btn-metronome');
+      if (button) button.classList.toggle('active-state', metronomeEnabled);
+      if (metronomeEnabled) {
+        try {
+          initAudio();
+          startMetronome();
+          showAudioStatus('Metrônomo ligado — ' + metronomeBpm + ' BPM', false, 1600);
+        } catch (err) {
+          metronomeEnabled = false;
+          if (button) button.classList.remove('active-state');
+          showAudioStatus(err.message || 'Não foi possível iniciar o metrônomo.', true);
+        }
+      } else {
+        stopMetronome();
+        showAudioStatus('Metrônomo desligado', false, 1200);
+      }
+    }
+
+    function setTempo(value) {
+      if (String(value).trim() === '') return;
+      const numericValue = Number(value);
+      if (!Number.isFinite(numericValue)) return;
+      metronomeBpm = Math.max(40, Math.min(240, Math.round(numericValue)));
+      const label = document.getElementById('tempo-value');
+      if (label) label.textContent = metronomeBpm + ' BPM';
+      if (metronomeEnabled) startMetronome();
+    }
+
+    function startMetronome() {
+      stopMetronome();
+      metronomeBeat = 0;
+      metronomeClick();
+      metronomeTimer = setInterval(metronomeClick, 60000 / metronomeBpm);
+    }
+
+    function stopMetronome() {
+      if (metronomeTimer) clearInterval(metronomeTimer);
+      metronomeTimer = null;
+    }
+
+    function metronomeClick() {
+      if (!audioCtx || !metronomeEnabled) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+      const now = audioCtx.currentTime;
+      const oscillator = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      const isDownbeat = metronomeBeat % 4 === 0;
+      oscillator.type = 'square';
+      oscillator.frequency.setValueAtTime(isDownbeat ? 1200 : 850, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(isDownbeat ? 0.16 : 0.10, now + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.055);
+      oscillator.connect(gain);
+      gain.connect(audioCtx.destination);
+      oscillator.start(now);
+      oscillator.stop(now + 0.06);
+      metronomeBeat = (metronomeBeat + 1) % 4;
+    }
+
+    function toggleDual() {
+      dualEnabled = !dualEnabled;
+      const btn = document.getElementById('btn-dual');
+      if (dualEnabled) {
+        btn.classList.add('active-state');
+        if (!secondTimbre) {
+          secondTimbre = currentTimbre === 'concert' ? 'warm' : 'concert';
+        }
+        showAudioStatus('Preparando o modo DUAL…', false, 45000);
+        Promise.all([currentTimbre, secondTimbre].map(loadPianoPreset)).then(() => {
+          showAudioStatus('Modo DUAL pronto', false, 1500);
+        }).catch(err => {
+          console.error('Falha ao carregar camada DUAL:', err);
+          showAudioStatus('Falha ao carregar um dos pianos do modo DUAL.', true);
+        });
+      } else {
+        btn.classList.remove('active-state');
+        secondTimbre = null;
+      }
+      updateTimbreButtons();
+    }
+
+    function updateTimbreButtons() {
+      document.querySelectorAll('.timbre-btn').forEach(button => button.classList.remove('active-state'));
+      [currentTimbre, ...(dualEnabled && secondTimbre ? [secondTimbre] : [])].forEach(key => {
+        const button = document.getElementById('btn-timbre-' + key);
+        if (button) button.classList.add('active-state');
+      });
+    }
+
+    function setTimbre(timbre) {
+      if (!PIANO_TIMBRES[timbre]) return;
+      if (dualEnabled) {
+        if (currentTimbre === timbre) {
+          return;
+        }
+        if (secondTimbre === timbre) {
+          secondTimbre = null;
+        } else if (!secondTimbre) {
+          secondTimbre = timbre;
+        } else {
+          currentTimbre = secondTimbre;
+          secondTimbre = timbre;
+        }
+      } else {
+        currentTimbre = timbre;
+        secondTimbre = null;
+      }
+
+      updateTimbreButtons();
+      document.getElementById('instrument-menu').classList.remove('open');
+      updateLed();
+      const toLoad = [currentTimbre];
+      if (dualEnabled && secondTimbre) toLoad.push(secondTimbre);
+      showAudioStatus('Carregando: ' + PIANO_TIMBRES[timbre].title + '…', false, 45000);
+      Promise.all(toLoad.map(loadPianoPreset)).then(() => {
+        showAudioStatus('Pronto: ' + PIANO_TIMBRES[timbre].title, false, 1500);
+      }).catch(err => {
+        console.error('Falha ao carregar timbre:', err);
+        showAudioStatus('Falha ao carregar. Verifique a conexão com a internet.', true);
+      });
+    }
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(()=>{});
+      } else if (document.exitFullscreen) {
+        document.exitFullscreen().catch(()=>{});
+      }
+    }
+
+    const NOTES = [
+      { id: 0,  namePt: 'C',  octave: 2, freq: 65.41,  isBlack: false },
+      { id: 1,  namePt: 'C#', octave: 2, freq: 69.30,  isBlack: true,  boundary: 0 },
+      { id: 2,  namePt: 'D',  octave: 2, freq: 73.42,  isBlack: false },
+      { id: 3,  namePt: 'D#', octave: 2, freq: 77.78,  isBlack: true,  boundary: 2 },
+      { id: 4,  namePt: 'E',  octave: 2, freq: 82.41,  isBlack: false },
+      { id: 5,  namePt: 'F',  octave: 2, freq: 87.31,  isBlack: false },
+      { id: 6,  namePt: 'F#', octave: 2, freq: 92.50,  isBlack: true,  boundary: 5 },
+      { id: 7,  namePt: 'G',  octave: 2, freq: 98.00,  isBlack: false },
+      { id: 8,  namePt: 'G#', octave: 2, freq: 103.83, isBlack: true,  boundary: 7 },
+      { id: 9,  namePt: 'A',  octave: 2, freq: 110.00, isBlack: false },
+      { id: 10, namePt: 'A#', octave: 2, freq: 116.54, isBlack: true,  boundary: 9 },
+      { id: 11, namePt: 'B',  octave: 2, freq: 123.47, isBlack: false },
+
+      { id: 12, namePt: 'C',  octave: 3, freq: 130.81, isBlack: false },
+      { id: 13, namePt: 'C#', octave: 3, freq: 138.59, isBlack: true,  boundary: 12 },
+      { id: 14, namePt: 'D',  octave: 3, freq: 146.83, isBlack: false },
+      { id: 15, namePt: 'D#', octave: 3, freq: 155.56, isBlack: true,  boundary: 14 },
+      { id: 16, namePt: 'E',  octave: 3, freq: 164.81, isBlack: false },
+      { id: 17, namePt: 'F',  octave: 3, freq: 174.61, isBlack: false },
+      { id: 18, namePt: 'F#', octave: 3, freq: 185.00, isBlack: true,  boundary: 17 },
+      { id: 19, namePt: 'G',  octave: 3, freq: 196.00, isBlack: false },
+      { id: 20, namePt: 'G#', octave: 3, freq: 207.65, isBlack: true,  boundary: 19 },
+      { id: 21, namePt: 'A',  octave: 3, freq: 220.00, isBlack: false },
+      { id: 22, namePt: 'A#', octave: 3, freq: 233.08, isBlack: true,  boundary: 21 },
+      { id: 23, namePt: 'B',  octave: 3, freq: 246.94, isBlack: false },
+
+      { id: 24, namePt: 'C',  octave: 4, freq: 261.63, isBlack: false },
+      { id: 25, namePt: 'C#', octave: 4, freq: 277.18, isBlack: true,  boundary: 24 },
+      { id: 26, namePt: 'D',  octave: 4, freq: 293.66, isBlack: false },
+      { id: 27, namePt: 'D#', octave: 4, freq: 311.13, isBlack: true,  boundary: 26 },
+      { id: 28, namePt: 'E',  octave: 4, freq: 329.63, isBlack: false },
+      { id: 29, namePt: 'F',  octave: 4, freq: 349.23, isBlack: false },
+      { id: 30, namePt: 'F#', octave: 4, freq: 369.99, isBlack: true,  boundary: 29 },
+      { id: 31, namePt: 'G',  octave: 4, freq: 392.00, isBlack: false }
+    ];
+
+    let audioCtx = null;
+    let webAudioFontPlayer = null;
+    let pianoBus = null;
+    let convolverNode = null;
+    let reverbGain = null;
+    const activeNodes = {};
+    const presetPromises = new Map();
+    let currentlyPressedId = null;
+    let audioStatusTimer = null;
+
+    function showAudioStatus(message, isError = false, duration = 2600) {
+      const el = document.getElementById('audio-status');
+      if (!el) return;
+      el.textContent = message;
+      el.classList.toggle('error', isError);
+      el.classList.add('visible');
+      if (audioStatusTimer) clearTimeout(audioStatusTimer);
+      if (!isError) {
+        audioStatusTimer = setTimeout(() => el.classList.remove('visible'), duration);
+      }
+    }
+
+    function initAudio() {
+      if (typeof WebAudioFontPlayer !== 'function') {
+        throw new Error('O reprodutor de piano não carregou. Verifique sua conexão e recarregue a página.');
+      }
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        webAudioFontPlayer = new WebAudioFontPlayer();
+        pianoBus = audioCtx.createGain();
+        pianoBus.gain.value = 0.82;
+        pianoBus.connect(audioCtx.destination);
+        createReverbImpulse();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(err => console.warn('Não foi possível iniciar o áudio:', err));
+      }
+    }
+
+    function createReverbImpulse() {
+      if (!audioCtx || convolverNode) return;
+      const rate = audioCtx.sampleRate;
+      const length = Math.floor(rate * 1.25);
+      const impulse = audioCtx.createBuffer(2, length, rate);
+      const left = impulse.getChannelData(0);
+      const right = impulse.getChannelData(1);
+      for (let i = 0; i < length; i++) {
+        const decay = Math.exp(-i / (rate * 0.32));
+        left[i] = (Math.random() * 2 - 1) * decay;
+        right[i] = (Math.random() * 2 - 1) * decay;
+      }
+      convolverNode = audioCtx.createConvolver();
+      convolverNode.buffer = impulse;
+      reverbGain = audioCtx.createGain();
+      reverbGain.gain.value = 0.14;
+      pianoBus.connect(convolverNode);
+      convolverNode.connect(reverbGain);
+      reverbGain.connect(audioCtx.destination);
+    }
+
+    function renderKeyboard() {
+      const keyboardEl = document.getElementById('keyboard');
+      keyboardEl.innerHTML = '';
+
+      let whiteCount = 0;
+      const totalWhite = NOTES.filter(n => !n.isBlack).length;
+
+      NOTES.forEach(note => {
+        if (!note.isBlack) {
+          const wKey = document.createElement('div');
+          wKey.className = 'white-key';
+          const indexFromBottom = totalWhite - 1 - whiteCount;
+          wKey.style.top = `calc((100% / ${totalWhite}) * ${indexFromBottom})`;
+          wKey.style.height = `calc(100% / ${totalWhite})`;
+          wKey.dataset.id = note.id;
+          wKey.innerText = `${note.namePt}${note.octave}`;
+
+          keyboardEl.appendChild(wKey);
+          whiteCount++;
+        }
+      });
+
+      NOTES.forEach(note => {
+        if (note.isBlack) {
+          const bKey = document.createElement('div');
+          bKey.className = 'black-key';
+          
+          const whiteNotesBelow = NOTES.slice(0, note.boundary).filter(n => !n.isBlack).length;
+          const indexFromBottom = totalWhite - 1 - whiteNotesBelow;
+
+          bKey.style.top = `calc(((100% / ${totalWhite}) * ${indexFromBottom}) - ((100% / ${totalWhite}) * 0.32))`;
+          bKey.style.height = `calc((100% / ${totalWhite}) * 0.65)`;
+          bKey.dataset.id = note.id;
+          bKey.innerText = `${note.namePt}${note.octave}`;
+
+          keyboardEl.appendChild(bKey);
+        }
+      });
+
+      setupTouchHandlers(keyboardEl);
+    }
+
+    function getKeyNoteFromPoint(x, y) {
+      const elements = document.elementsFromPoint(x, y);
+      for (let el of elements) {
+        if (el.classList.contains('black-key')) {
+          return parseInt(el.dataset.id, 10);
+        }
+      }
+      for (let el of elements) {
+        if (el.classList.contains('white-key')) {
+          return parseInt(el.dataset.id, 10);
+        }
+      }
+      return null;
+    }
+
+    function setupTouchHandlers(container) {
+      const handlePointer = (e) => {
+        e.preventDefault();
+        const noteId = getKeyNoteFromPoint(e.clientX, e.clientY);
+
+        if (noteId !== currentlyPressedId) {
+          if (currentlyPressedId !== null) {
+            stopSound(currentlyPressedId);
+            finishRecordedNote(currentlyPressedId);
+          }
+          if (noteId !== null) {
+            recordNoteOn(noteId);
+            playSound(noteId);
+          }
+          currentlyPressedId = noteId;
+        }
+      };
+
+      const handleRelease = (e) => {
+        e.preventDefault();
+        if (currentlyPressedId !== null) {
+          stopSound(currentlyPressedId);
+          finishRecordedNote(currentlyPressedId);
+          currentlyPressedId = null;
+        }
+      };
+
+      container.addEventListener('pointerdown', (e) => {
+        container.setPointerCapture(e.pointerId);
+        handlePointer(e);
+      });
+
+      container.addEventListener('pointermove', (e) => {
+        if (e.buttons > 0) {
+          handlePointer(e);
+        }
+      });
+
+      container.addEventListener('pointerup', handleRelease);
+      container.addEventListener('pointercancel', handleRelease);
+    }
+
+    // Banco GM padrão: seis famílias de piano em duas fontes sampleadas.
+    // FluidR3 GM: CC BY 3.0. GeneralUser GS: licença permite uso musical pessoal/comercial.
+    // Samples distribuídos pelo projeto WebAudioFont; carregados apenas quando selecionados.
+    const PIANO_TIMBRES = {
+      concert: {
+        title: 'Grand acústico de concerto', file: '0000_FluidR3_GM_sf2_file', gain: 0.72
+      },
+      warm: {
+        title: 'Grand acústico quente', file: '0000_GeneralUserGS_sf2_file', gain: 0.72
+      },
+      bright: {
+        title: 'Grand acústico brilhante', file: '0010_FluidR3_GM_sf2_file', gain: 0.68
+      },
+      pop: {
+        title: 'Grand brilhante para pop', file: '0010_GeneralUserGS_sf2_file', gain: 0.70
+      },
+      electricGrand: {
+        title: 'Piano elétrico de cauda', file: '0020_FluidR3_GM_sf2_file', gain: 0.70
+      },
+      electricGrandWarm: {
+        title: 'Piano elétrico de cauda, versão quente', file: '0020_GeneralUserGS_sf2_file', gain: 0.70
+      },
+      honky: {
+        title: 'Honky-tonk', file: '0030_FluidR3_GM_sf2_file', gain: 0.68
+      },
+      honkyVintage: {
+        title: 'Honky-tonk vintage', file: '0030_GeneralUserGS_sf2_file', gain: 0.68
+      },
+      rhodes: {
+        title: 'Piano elétrico EP1, estilo Rhodes', file: '0040_FluidR3_GM_sf2_file', gain: 0.68
+      },
+      stageEP: {
+        title: 'Piano elétrico EP1 de palco', file: '0040_GeneralUserGS_sf2_file', gain: 0.70
+      },
+      fm: {
+        title: 'Piano elétrico EP2, estilo FM/DX', file: '0050_FluidR3_GM_sf2_file', gain: 0.68
+      },
+      digitalEP: {
+        title: 'Piano elétrico EP2 digital', file: '0050_GeneralUserGS_sf2_file', gain: 0.70
+      },
+      accordionConcert: {
+        title: 'Acordeon de concerto', file: '0210_FluidR3_GM_sf2_file', gain: 0.78
+      },
+      accordionFolk: {
+        title: 'Acordeon folk', file: '0210_GeneralUserGS_sf2_file', gain: 0.78
+      },
+      accordionBright: {
+        title: 'Acordeon brilhante', file: '0210_Aspirin_sf2_file', gain: 0.76
+      },
+      accordionVintage: {
+        title: 'Acordeon vintage', file: '0210_JCLive_sf2_file', gain: 0.76
+      },
+      accordionTango: {
+        title: 'Acordeon tango', file: '0230_GeneralUserGS_sf2_file', gain: 0.78
+      }
+    };
+
+    const PIANO_SAMPLE_BASE = 'https://surikov.github.io/webaudiofontdata/sound/';
+    const HELD_NOTE_MAX_SECONDS = 180;
+
+    function loadPianoPreset(timbreKey) {
+      initAudio();
+      const timbre = PIANO_TIMBRES[timbreKey];
+      if (!timbre) return Promise.reject(new Error('Timbre de piano desconhecido.'));
+      if (presetPromises.has(timbreKey)) return presetPromises.get(timbreKey);
+
+      const variableName = '_tone_' + timbre.file;
+      const fileUrl = PIANO_SAMPLE_BASE + timbre.file + '.js';
+      const loader = webAudioFontPlayer.loader;
+      const promise = new Promise((resolve, reject) => {
+        let settled = false;
+        let scriptElement = null;
+        const finish = (error, preset) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeoutId);
+          if (scriptElement) scriptElement.removeEventListener('error', onScriptError);
+          if (error) reject(error);
+          else resolve(preset);
+        };
+        const onScriptError = () => {
+          const cached = loader.cached || [];
+          const index = cached.findIndex(item => item.variableName === variableName);
+          if (index >= 0) cached.splice(index, 1);
+          finish(new Error('Não foi possível baixar as amostras de piano.'));
+        };
+        const timeoutId = setTimeout(() => {
+          const cached = loader.cached || [];
+          const index = cached.findIndex(item => item.variableName === variableName);
+          if (index >= 0) cached.splice(index, 1);
+          finish(new Error('O carregamento das amostras demorou demais.'));
+        }, 45000);
+
+        loader.startLoad(audioCtx, fileUrl, variableName);
+        scriptElement = Array.from(document.scripts).find(script => script.src === fileUrl);
+        if (scriptElement) scriptElement.addEventListener('error', onScriptError, { once: true });
+        loader.waitLoad(() => {
+          const preset = window[variableName];
+          if (preset) finish(null, preset);
+          else finish(new Error('As amostras de piano não ficaram disponíveis.'));
+        });
+      });
+
+      // Guardar carregamentos em andamento e permitir nova tentativa após uma falha.
+      presetPromises.set(timbreKey, promise);
+      promise.catch(() => presetPromises.delete(timbreKey));
+      return promise;
+    }
+
+    function midiNumberFor(note, octaveOffset = currentOctaveOffset) {
+      const semitones = { C: 0, 'C#': 1, D: 2, 'D#': 3, E: 4, F: 5, 'F#': 6, G: 7, 'G#': 8, A: 9, 'A#': 10, B: 11 };
+      return (note.octave + 1 + octaveOffset) * 12 + semitones[note.namePt];
+    }
+
+    function getSolfegeName(note) {
+      const names = {
+        C: 'DÓ',
+        'C#': '<span class="led-accidental-note">DÓ#</span><span class="led-accidental-note">RÉb</span>',
+        D: 'RÉ',
+        'D#': '<span class="led-accidental-note">RÉ#</span><span class="led-accidental-note">MIb</span>',
+        E: 'MI',
+        F: 'FÁ',
+        'F#': '<span class="led-accidental-note">FÁ#</span><span class="led-accidental-note">SOLb</span>',
+        G: 'SOL',
+        'G#': '<span class="led-accidental-note">SOL#</span><span class="led-accidental-note">LÁb</span>',
+        A: 'LÁ',
+        'A#': '<span class="led-accidental-note">LÁ#</span><span class="led-accidental-note">SIb</span>',
+        B: 'SI'
+      };
+      return names[note.namePt] || '--';
+    }
+
+    function playSound(id, recordedOctaveOffset = currentOctaveOffset) {
+      try {
+        initAudio();
+      } catch (err) {
+        console.error(err);
+        showAudioStatus(err.message || 'Não foi possível iniciar o áudio.', true);
+        return;
+      }
+
+      const note = NOTES.find(n => n.id === id);
+      if (!note) return;
+
+      currentNoteName = getSolfegeName(note);
+      updateLed();
+
+      const keyEl = document.querySelector(`[data-id="${id}"]`);
+      if (keyEl) keyEl.classList.add('active');
+      if (activeNodes[id]) return;
+
+      const timbreKeys = [currentTimbre];
+      if (dualEnabled && secondTimbre && secondTimbre !== currentTimbre) {
+        timbreKeys.push(secondTimbre);
+      }
+      const midiNote = midiNumberFor(note, recordedOctaveOffset);
+      const noteState = { voices: [], pending: true };
+      activeNodes[id] = noteState;
+
+      if (!presetPromises.has(currentTimbre)) {
+        showAudioStatus('Carregando: ' + PIANO_TIMBRES[currentTimbre].title + '…', false, 45000);
+      }
+      Promise.all(timbreKeys.map(loadPianoPreset)).then(presets => {
+        if (activeNodes[id] !== noteState) return;
+        if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+        noteState.pending = false;
+        noteState.voices = presets.map((preset, index) => {
+          const timbre = PIANO_TIMBRES[timbreKeys[index]];
+          const envelope = webAudioFontPlayer.queueWaveTable(
+            audioCtx,
+            pianoBus,
+            preset,
+            audioCtx.currentTime,
+            midiNote,
+            HELD_NOTE_MAX_SECONDS,
+            timbre.gain / (presets.length > 1 ? 1.35 : 1)
+          );
+          return envelope ? { envelope } : null;
+        }).filter(Boolean);
+        if (!noteState.voices.length) {
+          delete activeNodes[id];
+          showAudioStatus('Este timbre não respondeu nessa nota.', true);
+        }
+      }).catch(err => {
+        if (activeNodes[id] === noteState) delete activeNodes[id];
+        console.error('Falha ao carregar timbre de piano:', err);
+        showAudioStatus('Falha ao carregar o piano. Verifique a internet e toque novamente.', true);
+      });
+    }
+
+    function stopSound(id) {
+      const keyEl = document.querySelector(`[data-id="${id}"]`);
+      if (keyEl) keyEl.classList.remove('active');
+      if (activeNodes[id]) fadeOutSound(id);
+    }
+
+    function fadeOutSound(id) {
+      const noteState = activeNodes[id];
+      if (!noteState) return;
+      const releaseTime = sustainEnabled ? 1.35 : 0.28;
+      noteState.voices.forEach(({ envelope }) => {
+        if (!envelope || !envelope.gain) return;
+        const now = audioCtx.currentTime;
+        const source = envelope.audioBufferSourceNode;
+        const timeConstant = Math.max(0.035, releaseTime / 5);
+        try {
+          envelope.gain.cancelScheduledValues(now);
+          envelope.gain.setTargetAtTime(0.00001, now, timeConstant);
+          if (source) source.stop(now + releaseTime + 0.06);
+        } catch (e) {}
+        envelope.when = now;
+        envelope.duration = releaseTime + 0.06;
+      });
+      delete activeNodes[id];
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      renderKeyboard();
+      try {
+        showAudioStatus('Carregando grand acústico…', false, 45000);
+        loadPianoPreset('concert').then(() => {
+          showAudioStatus('Grand acústico pronto', false, 1500);
+        }).catch(err => {
+          console.error('Falha no pré-carregamento do piano:', err);
+          showAudioStatus('O piano precisa de conexão para carregar as amostras.', true);
+        });
+      } catch (err) {
+        console.error(err);
+        showAudioStatus(err.message || 'Não foi possível iniciar o áudio.', true);
+      }
+    });
+  </script>
+</body>
+</html>
